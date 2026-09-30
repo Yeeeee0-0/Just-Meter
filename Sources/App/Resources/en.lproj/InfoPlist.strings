@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "Just Meter reads your audio input to calculate spectrum and loudness locally on this Mac.";
+"NSAudioCaptureUsageDescription" = "Just Meter captures system audio to calculate spectrum and loudness locally on this Mac.";

@@ -1,0 +1,4 @@
+"APP_TITLE" = "Standalone App";
+"APP_DESCRIPTION" = "Install in Applications to measure system audio, audio inputs and files.";
+"VST3_TITLE" = "VST3 Plug-in";
+"VST3_DESCRIPTION" = "Install in the system VST3 folder for compatible DAWs to scan and load.";

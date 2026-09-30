@@ -1,0 +1,4 @@
+"APP_TITLE" = "独立 App";
+"APP_DESCRIPTION" = "安装到“应用程序”，可独立测量系统音频、音频输入和文件。";
+"VST3_TITLE" = "VST3 插件";
+"VST3_DESCRIPTION" = "安装到系统 VST3 插件目录，供支持 VST3 的 DAW 扫描与挂载。";

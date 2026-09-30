@@ -1,0 +1,2 @@
+"NSMicrophoneUsageDescription" = "Just Meter 读取所选音频输入，仅在本机计算频谱和响度。";
+"NSAudioCaptureUsageDescription" = "Just Meter 读取系统播放的音频，仅在本机计算频谱和响度。";
