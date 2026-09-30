@@ -54,6 +54,10 @@ LRESULT CALLBACK Editor::procedure(HWND hwnd,UINT msg,WPARAM w,LPARAM l){
 void Editor::resize(int width,int height){if(window)SetWindowPos(window,nullptr,0,0,width,height,SWP_NOZORDER|SWP_NOACTIVATE);}
 void Editor::browserFailure(HRESULT result){std::string message="Just Meter requires Microsoft Edge WebView2 Runtime. Run the Just Meter installer to install it. / 请运行 Just Meter 安装器安装 Microsoft Edge WebView2 运行时。";std::ostringstream s;s<<message<<"\n0x"<<std::hex<<static_cast<unsigned long>(result);showError(s.str());}
 void Editor::initializeBrowser(){
+    // WebView2 can finish asynchronous callbacks after a DAW closes an editor.
+    // Keep this DLL's callback code mapped until the host exits; editor resources
+    // and measurement workers still close normally when their owners release them.
+    if(plugin){HMODULE pinnedModule=nullptr;GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,reinterpret_cast<LPCWSTR>(&moduleAnchor),&pinnedModule);}
     auto weak=weak_from_this();const auto cache=userFolder()/L"WebView2";
     HRESULT started=CreateCoreWebView2EnvironmentWithOptions(nullptr,cache.c_str(),nullptr,Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>([weak](HRESULT hr,ICoreWebView2Environment* env)->HRESULT{
         auto self=weak.lock();if(!self||!self->window)return S_OK;if(FAILED(hr)||!env){self->browserFailure(hr);return S_OK;}
@@ -88,7 +92,7 @@ void Editor::fileDialog(bool save){
     const bool chinese=preference(preferences,"interfaceLanguage",std::string(systemChinese()?"zh-Hans":"en"))=="zh-Hans";
     OPENFILENAMEW dialog{sizeof(dialog)};dialog.hwndOwner=window;dialog.lpstrFile=path;dialog.nMaxFile=32768;dialog.Flags=OFN_EXPLORER|OFN_NOCHANGEDIR|OFN_PATHMUSTEXIST|(save?OFN_OVERWRITEPROMPT:OFN_FILEMUSTEXIST);
     dialog.lpstrTitle=save?(chinese?L"导出 CSV":L"Export CSV"):(chinese?L"分析音频文件":L"Analyze Audio File");dialog.lpstrDefExt=save?L"csv":nullptr;
-    dialog.lpstrFilter=save?L"CSV (*.csv)\0*.csv\0\0":L"Audio / 音频\0*.wav;*.aif;*.aiff;*.mp3;*.m4a;*.aac;*.flac;*.wma\0All files / 所有文件\0*.*\0\0";
+    dialog.lpstrFilter=save?L"CSV (*.csv)\0*.csv\0\0":L"Audio / 音频\0*.wav;*.aif;*.aiff;*.aifc;*.mp3;*.m4a;*.aac;*.flac;*.wma\0All files / 所有文件\0*.*\0\0";
     if(save){if(GetSaveFileNameW(&dialog)&&!jm_write_csv(engine,utf8(path).c_str()))showError(chinese?"无法写入日志文件。":"Unable to write the log file.");}else if(GetOpenFileNameW(&dialog)&&audio)audio->startFile(path);
 }
 void Editor::showError(const std::string& message){if(ready)send({{"type","error"},{"message",message}});else if(window)MessageBoxW(window,wide(message).c_str(),L"Just Meter",MB_OK|MB_ICONERROR);}

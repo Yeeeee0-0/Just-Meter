@@ -25,9 +25,9 @@ Shares the macOS measurement core and VST3 audio processing: integrated/momentar
 
 System audio uses WASAPI loopback on the default output; input uses the default recording endpoint. Reselect the source after changing devices. Exclusive, protected, and direct ASIO audio may bypass the Windows mixer; use the VST3 inside a DAW.
 
-Windows 11 使用原生 Acrylic 窗口背景；Windows 10 使用兼容玻璃样式。Apple Liquid Glass 是 macOS 专属 API，Windows 的材质使用相同视觉方向的实现。音频文件由 Windows Media Foundation 解码，编码支持受系统版本影响。当前预览版没有 WLM DIAL/LM1 或响度矫正功能。
+Windows 11 使用原生 Acrylic 窗口背景；Windows 10 使用兼容玻璃样式。Apple Liquid Glass 是 macOS 专属 API，Windows 的材质使用相同视觉方向的实现。WAV、MP3、AAC、FLAC 等由 Windows Media Foundation 解码；PCM AIFF / AIFC 使用内置解码器。其他编码支持受系统版本影响。当前预览版没有 WLM DIAL/LM1 或响度矫正功能。
 
-Windows 11 uses native Acrylic with a compatible glass style on Windows 10. Apple's Liquid Glass API is macOS-specific. File decoding uses Windows Media Foundation; codec availability depends on the OS. This preview does not include WLM DIAL/LM1 or audio correction.
+Windows 11 uses native Acrylic with a compatible glass style on Windows 10. Apple's Liquid Glass API is macOS-specific. WAV, MP3, AAC and FLAC use Windows Media Foundation; PCM AIFF/AIFC uses a built-in decoder. Other codec availability depends on the OS. This preview does not include WLM DIAL/LM1 or audio correction.
 
 此预览版未配置 Windows 代码签名证书，首次下载或运行可能遇到 SmartScreen 提示。
 
@@ -40,6 +40,7 @@ Visual Studio 2022 C++ tools + Windows SDK, CMake 3.25+, Python + Pillow, Node.j
 ```powershell
 ./scripts/bootstrap-windows.ps1
 python -m pip install Pillow==11.3.0
+python Tests/generate_aiff_fixture.py
 cmake -S . -B build/windows -A x64
 cmake --build build/windows --config Release --parallel
 ctest --test-dir build/windows -C Release --output-on-failure

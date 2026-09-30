@@ -15,6 +15,7 @@ class AudioCapture {
     void prepare(const char* source);
     void capture(bool loopback);
     void analyze(const std::wstring& path);
+    bool analyzeAIFF(const std::wstring& path);
     void failure(const std::exception& e);
 public:
     explicit AudioCapture(JMHandle handle):engine(handle){}

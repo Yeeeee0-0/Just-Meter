@@ -61,6 +61,7 @@ void AudioCapture::capture(bool loopback){
     }
 }
 void AudioCapture::analyze(const std::wstring& path){
+    if(analyzeAIFF(path))return;
     ComApartment com;check(com.result,"Initialize file decoder");check(MFStartup(MF_VERSION,MFSTARTUP_LITE),"Initialize Media Foundation");
     struct Shutdown{~Shutdown(){MFShutdown();}} shutdown;
     ComPtr<IMFSourceReader> reader;check(MFCreateSourceReaderFromURL(path.c_str(),nullptr,&reader),"Open audio file");

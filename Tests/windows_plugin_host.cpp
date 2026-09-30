@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <objbase.h>
 #include "pluginterfaces/base/ipluginbase.h"
 #include "pluginterfaces/gui/iplugview.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
