@@ -68,10 +68,13 @@ void Editor::initializeBrowser(){
             ComPtr<ICoreWebView2Settings> settings;e->web->get_Settings(&settings);settings->put_AreDefaultContextMenusEnabled(FALSE);settings->put_AreDevToolsEnabled(FALSE);settings->put_IsStatusBarEnabled(FALSE);settings->put_IsZoomControlEnabled(FALSE);settings->put_AreDefaultScriptDialogsEnabled(FALSE);
             EventRegistrationToken token{};
             e->web->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>([weak](ICoreWebView2*,ICoreWebView2WebMessageReceivedEventArgs* args)->HRESULT{auto e=weak.lock();if(!e||!e->window)return S_OK;LPWSTR raw=nullptr;if(SUCCEEDED(args->get_WebMessageAsJson(&raw))&&raw){std::wstring message(raw);CoTaskMemFree(raw);try{e->receive(message);}catch(const std::exception&error){e->showError(error.what());}}return S_OK;}).Get(),&token);
-            e->web->add_NavigationStarting(Callback<ICoreWebView2NavigationStartingEventHandler>([](ICoreWebView2*,ICoreWebView2NavigationStartingEventArgs* args)->HRESULT{LPWSTR uri=nullptr;args->get_Uri(&uri);if(!uri||wcscmp(uri,L"about:blank")!=0)args->put_Cancel(TRUE);CoTaskMemFree(uri);return S_OK;}).Get(),&token);
+            // NavigateToString reports a data: URL during startup, then commits about:blank.
+            // Permit only this one host-initiated embedded navigation; external pages remain blocked.
+            e->web->add_NavigationStarting(Callback<ICoreWebView2NavigationStartingEventHandler>([weak](ICoreWebView2*,ICoreWebView2NavigationStartingEventArgs* args)->HRESULT{auto e=weak.lock();LPWSTR uri=nullptr;args->get_Uri(&uri);bool allowed=uri&&wcscmp(uri,L"about:blank")==0;if(e&&e->allowEmbeddedNavigation&&uri&&wcsncmp(uri,L"data:text/html",14)==0){allowed=true;e->allowEmbeddedNavigation=false;}if(!allowed)args->put_Cancel(TRUE);CoTaskMemFree(uri);return S_OK;}).Get(),&token);
+            e->web->add_NavigationCompleted(Callback<ICoreWebView2NavigationCompletedEventHandler>([weak](ICoreWebView2*,ICoreWebView2NavigationCompletedEventArgs* args)->HRESULT{auto e=weak.lock();if(!e||!e->window)return S_OK;BOOL success=FALSE;args->get_IsSuccess(&success);if(!success){COREWEBVIEW2_WEB_ERROR_STATUS error;args->get_WebErrorStatus(&error);e->showError("Editor navigation failed: "+std::to_string(int(error)));}else if(!e->ready)e->startupStage="HTML loaded; awaiting script ready";return S_OK;}).Get(),&token);
             e->web->add_NewWindowRequested(Callback<ICoreWebView2NewWindowRequestedEventHandler>([](ICoreWebView2*,ICoreWebView2NewWindowRequestedEventArgs* args)->HRESULT{args->put_Handled(TRUE);return S_OK;}).Get(),&token);
             e->web->add_PermissionRequested(Callback<ICoreWebView2PermissionRequestedEventHandler>([](ICoreWebView2*,ICoreWebView2PermissionRequestedEventArgs* args)->HRESULT{args->put_State(COREWEBVIEW2_PERMISSION_STATE_DENY);return S_OK;}).Get(),&token);
-            auto resource=FindResourceW(e->module,MAKEINTRESOURCEW(102),RT_RCDATA);if(!resource){e->showError("Embedded interface is missing");return S_OK;}auto data=LoadResource(e->module,resource);auto bytes=static_cast<const char*>(LockResource(data));const auto html=wide(std::string(bytes,SizeofResource(e->module,resource)));e->startupStage="HTML navigation requested";check(e->web->NavigateToString(html.c_str()),"Load embedded editor");return S_OK;
+            auto resource=FindResourceW(e->module,MAKEINTRESOURCEW(102),RT_RCDATA);if(!resource){e->showError("Embedded interface is missing");return S_OK;}auto data=LoadResource(e->module,resource);auto bytes=static_cast<const char*>(LockResource(data));const auto html=wide(std::string(bytes,SizeofResource(e->module,resource)));e->startupStage="HTML navigation requested";e->allowEmbeddedNavigation=true;check(e->web->NavigateToString(html.c_str()),"Load embedded editor");return S_OK;
         }).Get());
     }).Get());
     if(FAILED(started))browserFailure(started);
@@ -98,7 +101,8 @@ void Editor::fileDialog(bool save){
 void Editor::showError(const std::string& message){if(!smokePath.empty()){std::ofstream(std::filesystem::path(smokePath))<<json({{"fatal",message}}).dump(2);if(window)PostMessageW(window,WM_CLOSE,0,0);return;}if(ready)send({{"type","error"},{"message",message}});else if(window)MessageBoxW(window,wide(message).c_str(),L"Just Meter",MB_OK|MB_ICONERROR);}
 void Editor::analyze(const std::wstring& path){if(audio)audio->startFile(path);}
 void Editor::receive(const std::wstring& raw){if(raw.size()>1048576)return;const auto message=json::parse(utf8(raw),nullptr,false);if(!message.is_object())return;const auto type=message.value("type",std::string());
-    if(type=="ready"){ready=true;ticks=0;sendState();refresh();}
+    if(type=="ready"){allowEmbeddedNavigation=false;ready=true;ticks=0;sendState();refresh();}
+    else if(type=="startup-error")showError(message.value("message",std::string("Interface script error")));
     else if(type=="preferences"&&message.contains("value")&&message["value"].is_object()){preferences=message["value"];persist();}
     else if(type=="pause"){JMSnapshot s{};jm_snapshot(engine,&s);jm_pause(engine,!s.paused);}
     else if(type=="reset")jm_reset(engine);

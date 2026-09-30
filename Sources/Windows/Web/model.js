@@ -22,7 +22,7 @@
     let wid=typeof w.id==='string'?w.id:id();if(seen.has(wid))wid=id();seen.add(wid);
     const list=[...new Set((Array.isArray(w.fields)?w.fields:[]).filter(f=>fields[w.kind].includes(f)))];
     return {id:wid,kind:w.kind,width:Math.round(number(w.width,1,2,1)),height:Math.round(number(w.height,1,2,1)),fields:list.length?list:[fields[w.kind][0]]};
-   });return {id:l.id,name:String(l.name??'').slice(0,40),widgets:widgets.length?widgets:[widget('spectrum')]};
+   });return {id:l.id,name:String(l.name??'').slice(0,40),widgets:widgets.length?widgets:[widget('loudness')]};
   });
   if(p.selected!=='default'&&!p.layouts.some(l=>l.id===p.selected))p.selected='default';
   return p;

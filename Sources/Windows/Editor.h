@@ -19,7 +19,7 @@ class Editor:public std::enable_shared_from_this<Editor>{
     unsigned ticks=0;
     nlohmann::json history=nlohmann::json::array();
     std::wstring smokePath;
-    bool smokeStarted=false;
+    bool smokeStarted=false,allowEmbeddedNavigation=false;
     std::string startupStage="window";
     Editor(JMHandle handle,bool isPlugin);
     void initializeBrowser();

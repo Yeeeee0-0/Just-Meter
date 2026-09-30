@@ -19,6 +19,7 @@ if (!$app.WaitForExit(60000)) { Stop-Process $app.Id -Force; throw 'Standalone e
 if (Test-Path $report) { Get-Content $report -Raw | Write-Host }
 if ($app.ExitCode -ne 0 -or !(Test-Path $report)) { throw 'Standalone test failed' }
 $outer = Get-Content $report -Raw | ConvertFrom-Json
+if ($outer.fatal) { throw $outer.fatal }
 $encoded = $outer.result | ConvertFrom-Json
 $ui = $encoded | ConvertFrom-Json
 if (!$outer.webview -or !$ui.ready -or $ui.widgets -ne 4 -or $ui.errors) { throw "Invalid UI result: $encoded" }
