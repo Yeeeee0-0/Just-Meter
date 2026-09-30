@@ -1,4 +1,7 @@
 #include "MeterCore.h"
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include "ebur128.h"
 #include <array>
 #include <atomic>
@@ -126,7 +129,13 @@ void jm_snapshot(JMHandle h,JMSnapshot*s){auto&e=*static_cast<Engine*>(h);std::l
 void jm_spectrum(JMHandle h,float*p){auto&e=*static_cast<Engine*>(h);std::lock_guard<std::mutex>g(e.lock);std::copy(e.spectrum.begin(),e.spectrum.end(),p);}
 void jm_vectors(JMHandle h,float*p){auto&e=*static_cast<Engine*>(h);std::lock_guard<std::mutex>g(e.lock);std::copy(e.vectors.begin(),e.vectors.end(),p);}
 int jm_history(JMHandle h,JMHistory*p,int cap){auto&e=*static_cast<Engine*>(h);std::lock_guard<std::mutex>g(e.lock);int size=int(e.history.size()),n=std::min(size,cap);for(int i=0;i<n;++i){int j=n>1?i*(size-1)/(n-1):0;p[i]=e.history[(e.historyStart+j)%size];}return n;}
-int jm_write_csv(JMHandle h,const char*path){auto&e=*static_cast<Engine*>(h);std::lock_guard<std::mutex>g(e.lock);FILE*f=fopen(path,"w");if(!f)return 0;fprintf(f,"Time_s,M_LUFS,S_LUFS,I_LUFS,TruePeakHold_dBTP\n");for(size_t i=0;i<e.history.size();++i){auto&a=e.history[(e.historyStart+i)%e.history.size()];fprintf(f,"%.3f,%.3f,%.3f,%.3f,%.3f\n",a.time,a.momentary,a.shortTerm,a.integrated,a.truePeak);}return fclose(f)==0;}
+int jm_write_csv(JMHandle h,const char*path){auto&e=*static_cast<Engine*>(h);std::lock_guard<std::mutex>g(e.lock);FILE*f=nullptr;
+#ifdef _WIN32
+int count=MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,path,-1,nullptr,0);if(!count)return 0;std::vector<wchar_t>widePath(count);MultiByteToWideChar(CP_UTF8,MB_ERR_INVALID_CHARS,path,-1,widePath.data(),count);f=_wfopen(widePath.data(),L"w");
+#else
+f=fopen(path,"w");
+#endif
+if(!f)return 0;fprintf(f,"Time_s,M_LUFS,S_LUFS,I_LUFS,TruePeakHold_dBTP\n");for(size_t i=0;i<e.history.size();++i){auto&a=e.history[(e.historyStart+i)%e.history.size()];fprintf(f,"%.3f,%.3f,%.3f,%.3f,%.3f\n",a.time,a.momentary,a.shortTerm,a.integrated,a.truePeak);}return fclose(f)==0;}
 int jm_get_state(JMHandle h,char*out,int capacity){auto&e=*static_cast<Engine*>(h);std::lock_guard<std::mutex>g(e.stateLock);int n=int(e.savedState.size());if(out&&capacity>=n)memcpy(out,e.savedState.data(),n);return n;}
 void jm_set_state(JMHandle h,const char*in,int length){if(length<0||length>1048576)return;auto&e=*static_cast<Engine*>(h);std::lock_guard<std::mutex>g(e.stateLock);e.savedState.assign(in,length);e.stateVersion++;}
 uint64_t jm_state_version(JMHandle h){return static_cast<Engine*>(h)->stateVersion.load();}

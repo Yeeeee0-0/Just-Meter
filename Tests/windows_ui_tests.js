@@ -1,0 +1,34 @@
+'use strict';
+// DOM regression checks run without a browser or any native audio privileges.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
+const {JSDOM}=require(path.resolve('build/dom-tests/node_modules/jsdom'));
+const sent=[],listeners=[];
+const html=fs.readFileSync('build/windows/generated/MeterWeb.html','utf8');
+const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,beforeParse(w){
+    w.matchMedia=()=>({matches:false,addEventListener(){}});
+    w.chrome={webview:{postMessage:x=>sent.push(x),addEventListener:(event,fn)=>listeners.push(fn)}};
+}});
+const w=dom.window,d=w.document;
+const send=data=>listeners.forEach(fn=>fn({data}));
+const action=(name,scope=d)=>{const b=scope.querySelector(`[data-action="${name}"]`);assert(b&&!b.disabled,`missing ${name}`);b.click();};
+const change=(key,value)=>{const el=d.querySelector(`[data-pref="${key}"]`);assert(el,key);el.value=value;el.dispatchEvent(new w.Event('change',{bubbles:true}));};
+send({type:'state',plugin:false,language:'zh-Hans',preferences:{}});
+assert.equal(d.querySelectorAll('.widget').length,4);assert.equal(d.querySelector('.layout-name').textContent.trim(),'默认 ⌄');
+action('settings');assert(!d.querySelector('.layout-name'));
+change('interfaceLanguage','en');assert.equal(d.querySelector('h1').textContent,'Settings');
+change('theme','dark');assert.equal(d.documentElement.dataset.theme,'dark');
+change('interfaceScale','0.75');assert.equal(Number(d.body.style.zoom),0.75);
+action('about');assert.equal(d.querySelector('[role=dialog] h2').textContent,'Yee Huang');assert.equal(d.querySelector('[role=dialog] a').textContent,'yeehuang2002@163.com');assert(!d.querySelector('[role=dialog]').textContent.includes('Update'));action('close-modal');
+d.querySelector('[data-tab="布局"]').click();assert.equal(d.querySelectorAll('.layout-row').length,1);assert(!d.querySelector('[data-action=layout-options]'));
+action('edit-layout');assert.equal(d.querySelectorAll('.widget').length,4);assert(!d.querySelector('.layout-name'));
+action('widget-config');
+d.querySelector('[data-size="2,2"]').click();action('close-modal');
+const title=d.querySelector('#layout-name');title.value='Master <safe>';title.dispatchEvent(new w.Event('input',{bubbles:true}));action('save-edit');
+assert.equal(d.querySelectorAll('.layout-row').length,2);assert(d.body.textContent.includes('Master <safe>'));assert(!d.querySelector('safe'));
+const pref=sent.filter(x=>x.type==='preferences').at(-1).value;assert.equal(pref.layouts.length,1);assert.equal(pref.layouts[0].widgets[0].width,2);assert.equal(pref.layouts[0].widgets[0].height,2);assert.equal(pref.selected,'default');
+action('use-layout');action('settings');assert.equal(d.querySelector('.layout-name').textContent.trim(),'Master <safe> ⌄');
+send({type:'meter',snapshot:{integrated:-20,range:3,truePeak:-.5,active:1,seconds:5},spectrum:[],vectors:[],history:[],source:{source:'complete',file:'test.wav'}});
+assert.equal(d.querySelector('[data-reading="整段 I"]').textContent,'−20.0');assert(d.querySelector('[data-reading="True Peak"]').classList.contains('over'));
+send({type:'state',plugin:true,language:'en',preferences:pref});assert(!d.querySelector('[data-action=pin]'));assert(!d.querySelector('[data-action=source]'));
+action('settings');d.querySelector('[data-tab="响度"]').click();assert(d.querySelector('[data-pref=followTransport]'));change('unit','LU');assert(d.querySelector('[data-pref=reference]'));
+dom.window.close();console.log('PASS: languages, appearance, scale, hidden preset, about, widget resize, safe names, saved layouts, real readouts, plugin controls');

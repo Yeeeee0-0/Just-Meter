@@ -1,0 +1,27 @@
+#include <windows.h>
+101 ICON "@JM_ICON@"
+102 RCDATA "@JM_HTML@"
+1 RT_MANIFEST "@JM_MANIFEST@"
+1 VERSIONINFO
+FILEVERSION 0,1,3,4
+PRODUCTVERSION 0,1,3,4
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+BEGIN
+ BLOCK "StringFileInfo"
+ BEGIN
+  BLOCK "040904B0"
+  BEGIN
+   VALUE "CompanyName", "Yee Huang\0"
+   VALUE "FileDescription", "Just Meter\0"
+   VALUE "FileVersion", "0.1.3\0"
+   VALUE "ProductName", "Just Meter\0"
+   VALUE "ProductVersion", "0.1.3\0"
+   VALUE "LegalCopyright", "Copyright 2026 Yee Huang\0"
+  END
+ END
+ BLOCK "VarFileInfo"
+ BEGIN
+  VALUE "Translation", 0x409, 1200
+ END
+END

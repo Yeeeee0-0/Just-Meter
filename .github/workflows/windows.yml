@@ -1,0 +1,61 @@
+name: Windows standalone and VST3
+on:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare dependencies
+        run: |
+          python -m pip install Pillow==11.3.0
+          ./scripts/bootstrap-windows.ps1
+          python Tests/generate_aiff_fixture.py
+          npm install --prefix build/dom-tests --no-save jsdom@26.1.0
+      - name: Build Windows binaries and validator
+        run: |
+          cmake -S . -B build/windows -G "Visual Studio 17 2022" -A x64
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          cmake --build build/windows --config Release --parallel 4 --target JustMeterApp JustMeter MeterCoreTests WindowsAudioTests WindowsPluginHost validator
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Check measurement and preferences
+        run: |
+          node Tests/windows_model_tests.js
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node Tests/windows_ui_tests.js
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          ctest --test-dir build/windows -C Release --output-on-failure
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $validator = (Get-ChildItem build/windows -Recurse -Filter validator.exe | Select-Object -First 1).FullName
+          $bundle = (Get-ChildItem build/windows/VST3/Release -Directory -Filter '*.vst3' | Select-Object -First 1).FullName
+          & $validator $bundle
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Check standalone and VST3 editor
+        run: ./scripts/test-windows-gui.ps1
+      - name: Build bilingual installer
+        run: ./scripts/package-windows.ps1
+      - name: Check installer component selection
+        run: ./scripts/test-windows-installer.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Just-Meter-Windows-x64-preview
+          if-no-files-found: warn
+          path: |
+            outputs/Just-Meter-*-Windows-*
+            outputs/windows-*.json
+            outputs/windows-*.png
+            build/windows/Testing/Temporary/LastTest.log
