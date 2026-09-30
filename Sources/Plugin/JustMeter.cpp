@@ -25,10 +25,16 @@ class MeterEditor:public CPluginView {
 public:
     MeterEditor(JMHandle e,FUnknown* o):engine(e),owner(o){owner->addRef();rect=ViewRect(0,0,1000,760);}
     ~MeterEditor() override {if(view)jm_destroy_editor(view);owner->release();}
-    tresult PLUGIN_API isPlatformTypeSupported(FIDString type) override {return type&&strcmp(type,kPlatformTypeNSView)==0?kResultTrue:kResultFalse;}
+    tresult PLUGIN_API isPlatformTypeSupported(FIDString type) override {
+#if defined(_WIN32)
+        return type&&strcmp(type,kPlatformTypeHWND)==0?kResultTrue:kResultFalse;
+#else
+        return type&&strcmp(type,kPlatformTypeNSView)==0?kResultTrue:kResultFalse;
+#endif
+    }
     tresult PLUGIN_API attached(void* parent,FIDString type) override {
         if(!parent||isPlatformTypeSupported(type)!=kResultTrue)return kResultFalse;
-        if(view)jm_destroy_editor(view);view=jm_create_editor(engine);jm_attach_editor(view,parent);jm_resize_editor(view,rect.getWidth(),rect.getHeight());return CPluginView::attached(parent,type);
+        if(view)jm_destroy_editor(view);view=jm_create_editor(engine);if(!view)return kResultFalse;jm_attach_editor(view,parent);jm_resize_editor(view,rect.getWidth(),rect.getHeight());return CPluginView::attached(parent,type);
     }
     tresult PLUGIN_API removed() override {if(view){jm_destroy_editor(view);view=nullptr;}return CPluginView::removed();}
     tresult PLUGIN_API canResize() override{return kResultTrue;}
