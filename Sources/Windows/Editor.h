@@ -20,6 +20,7 @@ class Editor:public std::enable_shared_from_this<Editor>{
     nlohmann::json history=nlohmann::json::array();
     std::wstring smokePath;
     bool smokeStarted=false;
+    std::string startupStage="window";
     Editor(JMHandle handle,bool isPlugin);
     void initializeBrowser();
     void browserFailure(HRESULT error);

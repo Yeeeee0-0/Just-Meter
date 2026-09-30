@@ -58,11 +58,11 @@ void Editor::initializeBrowser(){
     // Keep this DLL's callback code mapped until the host exits; editor resources
     // and measurement workers still close normally when their owners release them.
     if(plugin){HMODULE pinnedModule=nullptr;GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_PIN,reinterpret_cast<LPCWSTR>(&moduleAnchor),&pinnedModule);}
-    auto weak=weak_from_this();const auto cache=userFolder()/L"WebView2";
+    startupStage="WebView2 environment requested";auto weak=weak_from_this();const auto cache=userFolder()/L"WebView2";
     HRESULT started=CreateCoreWebView2EnvironmentWithOptions(nullptr,cache.c_str(),nullptr,Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>([weak](HRESULT hr,ICoreWebView2Environment* env)->HRESULT{
-        auto self=weak.lock();if(!self||!self->window)return S_OK;if(FAILED(hr)||!env){self->browserFailure(hr);return S_OK;}
+        auto self=weak.lock();if(!self||!self->window)return S_OK;self->startupStage="WebView2 environment callback";if(FAILED(hr)||!env){self->browserFailure(hr);return S_OK;}
         return env->CreateCoreWebView2Controller(self->window,Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>([weak](HRESULT result,ICoreWebView2Controller* control)->HRESULT{
-            auto e=weak.lock();if(!e||!e->window)return S_OK;if(FAILED(result)||!control){e->browserFailure(result);return S_OK;}e->controller=control;control->get_CoreWebView2(&e->web);if(!e->web){e->browserFailure(E_FAIL);return S_OK;}
+            auto e=weak.lock();if(!e||!e->window)return S_OK;e->startupStage="WebView2 controller callback";if(FAILED(result)||!control){e->browserFailure(result);return S_OK;}e->controller=control;control->get_CoreWebView2(&e->web);if(!e->web){e->browserFailure(E_FAIL);return S_OK;}
             RECT r;GetClientRect(e->window,&r);control->put_Bounds(r);control->put_IsVisible(TRUE);
             ComPtr<ICoreWebView2Controller2> transparent;if(SUCCEEDED(control->QueryInterface(IID_PPV_ARGS(&transparent))))transparent->put_DefaultBackgroundColor(COREWEBVIEW2_COLOR{0,0,0,0});
             ComPtr<ICoreWebView2Settings> settings;e->web->get_Settings(&settings);settings->put_AreDefaultContextMenusEnabled(FALSE);settings->put_AreDevToolsEnabled(FALSE);settings->put_IsStatusBarEnabled(FALSE);settings->put_IsZoomControlEnabled(FALSE);settings->put_AreDefaultScriptDialogsEnabled(FALSE);
@@ -71,7 +71,7 @@ void Editor::initializeBrowser(){
             e->web->add_NavigationStarting(Callback<ICoreWebView2NavigationStartingEventHandler>([](ICoreWebView2*,ICoreWebView2NavigationStartingEventArgs* args)->HRESULT{LPWSTR uri=nullptr;args->get_Uri(&uri);if(!uri||wcscmp(uri,L"about:blank")!=0)args->put_Cancel(TRUE);CoTaskMemFree(uri);return S_OK;}).Get(),&token);
             e->web->add_NewWindowRequested(Callback<ICoreWebView2NewWindowRequestedEventHandler>([](ICoreWebView2*,ICoreWebView2NewWindowRequestedEventArgs* args)->HRESULT{args->put_Handled(TRUE);return S_OK;}).Get(),&token);
             e->web->add_PermissionRequested(Callback<ICoreWebView2PermissionRequestedEventHandler>([](ICoreWebView2*,ICoreWebView2PermissionRequestedEventArgs* args)->HRESULT{args->put_State(COREWEBVIEW2_PERMISSION_STATE_DENY);return S_OK;}).Get(),&token);
-            auto resource=FindResourceW(e->module,MAKEINTRESOURCEW(102),RT_RCDATA);if(!resource){e->showError("Embedded interface is missing");return S_OK;}auto data=LoadResource(e->module,resource);auto bytes=static_cast<const char*>(LockResource(data));const auto html=wide(std::string(bytes,SizeofResource(e->module,resource)));e->web->NavigateToString(html.c_str());return S_OK;
+            auto resource=FindResourceW(e->module,MAKEINTRESOURCEW(102),RT_RCDATA);if(!resource){e->showError("Embedded interface is missing");return S_OK;}auto data=LoadResource(e->module,resource);auto bytes=static_cast<const char*>(LockResource(data));const auto html=wide(std::string(bytes,SizeofResource(e->module,resource)));e->startupStage="HTML navigation requested";check(e->web->NavigateToString(html.c_str()),"Load embedded editor");return S_OK;
         }).Get());
     }).Get());
     if(FAILED(started))browserFailure(started);
@@ -95,10 +95,10 @@ void Editor::fileDialog(bool save){
     dialog.lpstrFilter=save?L"CSV (*.csv)\0*.csv\0\0":L"Audio / 音频\0*.wav;*.aif;*.aiff;*.aifc;*.mp3;*.m4a;*.aac;*.flac;*.wma\0All files / 所有文件\0*.*\0\0";
     if(save){if(GetSaveFileNameW(&dialog)&&!jm_write_csv(engine,utf8(path).c_str()))showError(chinese?"无法写入日志文件。":"Unable to write the log file.");}else if(GetOpenFileNameW(&dialog)&&audio)audio->startFile(path);
 }
-void Editor::showError(const std::string& message){if(ready)send({{"type","error"},{"message",message}});else if(window)MessageBoxW(window,wide(message).c_str(),L"Just Meter",MB_OK|MB_ICONERROR);}
+void Editor::showError(const std::string& message){if(!smokePath.empty()){std::ofstream(std::filesystem::path(smokePath))<<json({{"fatal",message}}).dump(2);if(window)PostMessageW(window,WM_CLOSE,0,0);return;}if(ready)send({{"type","error"},{"message",message}});else if(window)MessageBoxW(window,wide(message).c_str(),L"Just Meter",MB_OK|MB_ICONERROR);}
 void Editor::analyze(const std::wstring& path){if(audio)audio->startFile(path);}
 void Editor::receive(const std::wstring& raw){if(raw.size()>1048576)return;const auto message=json::parse(utf8(raw),nullptr,false);if(!message.is_object())return;const auto type=message.value("type",std::string());
-    if(type=="ready"){ready=true;sendState();refresh();}
+    if(type=="ready"){ready=true;ticks=0;sendState();refresh();}
     else if(type=="preferences"&&message.contains("value")&&message["value"].is_object()){preferences=message["value"];persist();}
     else if(type=="pause"){JMSnapshot s{};jm_snapshot(engine,&s);jm_pause(engine,!s.paused);}
     else if(type=="reset")jm_reset(engine);
@@ -110,7 +110,7 @@ void Editor::receive(const std::wstring& raw){if(raw.size()>1048576)return;const
     else if(type=="disconnect"&&audio)audio->stop();
     else if(type=="email")ShellExecuteW(window,L"open",L"mailto:yeehuang2002@163.com",nullptr,nullptr,SW_SHOWNORMAL);
 }
-void Editor::refresh(){if(!ready||!web)return;try{
+void Editor::refresh(){if(!ready||!web){if(!smokePath.empty()&&++ticks>400)showError("Editor startup timed out at: "+startupStage);return;}try{
     if(plugin&&jm_state_version(engine)!=version){restore();appearance();sendState();}
     JMSnapshot s{};jm_snapshot(engine,&s);std::array<float,64>spectrum;std::array<float,256>vectors;jm_spectrum(engine,spectrum.data());jm_vectors(engine,vectors.data());
     if(ticks++%5==0){std::array<JMHistory,720> buffer;const int n=jm_history(engine,buffer.data(),int(buffer.size()));history=json::array();for(int i=0;i<n;++i){const auto&h=buffer[i];history.push_back({{"time",h.time},{"momentary",h.momentary},{"shortTerm",h.shortTerm},{"integrated",h.integrated},{"truePeak",h.truePeak}});}}

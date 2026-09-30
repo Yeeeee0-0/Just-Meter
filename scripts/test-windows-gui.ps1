@@ -6,13 +6,17 @@ if (!$runtime.pv) {
     Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile build/WebView2Setup.exe
     $signature = Get-AuthenticodeSignature build/WebView2Setup.exe
     if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft Corporation') { throw 'Invalid Microsoft runtime signature' }
-    $install = Start-Process build/WebView2Setup.exe -ArgumentList '/silent /install' -Wait -PassThru
+    Write-Host 'Installing Microsoft WebView2 Runtime'
+    $install = Start-Process build/WebView2Setup.exe -ArgumentList '/silent /install' -PassThru
+    if (!$install.WaitForExit(240000)) { Stop-Process $install.Id -Force; throw 'WebView2 Runtime install timed out' }
     if ($install.ExitCode -ne 0) { throw "Runtime installation failed: $($install.ExitCode)" }
 }
 $report = Join-Path $PWD outputs/windows-ui.json
 $file = Join-Path $PWD Tests/Reference-1kHz-stereo-minus20dBFS.wav
+Write-Host 'Starting standalone audio and UI check'
 $app = Start-Process 'build/windows/Release/Just Meter.exe' -ArgumentList "--smoke-test `"$report`" --analyze `"$file`"" -PassThru
 if (!$app.WaitForExit(60000)) { Stop-Process $app.Id -Force; throw 'Standalone editor did not become ready' }
+if (Test-Path $report) { Get-Content $report -Raw | Write-Host }
 if ($app.ExitCode -ne 0 -or !(Test-Path $report)) { throw 'Standalone test failed' }
 $outer = Get-Content $report -Raw | ConvertFrom-Json
 $encoded = $outer.result | ConvertFrom-Json
@@ -22,6 +26,7 @@ $value = [double]::Parse($ui.integrated.Replace('−','-'), [Globalization.Cultu
 if ([Math]::Abs($value + 20) -gt 0.15) { throw "Meter display is not driven by decoded audio: $value" }
 $dll = (Get-ChildItem build/windows/VST3/Release -Recurse -File -Filter '*.vst3' | Select-Object -First 1).FullName
 if (!$dll) { throw 'VST3 binary not found' }
+Write-Host 'Starting VST3 host check'
 $test = Start-Process build/windows/Release/WindowsPluginHost.exe -ArgumentList "`"$dll`"" -PassThru -NoNewWindow
 if (!$test.WaitForExit(60000)) { Stop-Process $test.Id -Force; throw 'VST3 editor timed out' }
 if ($test.ExitCode -ne 0) { throw 'VST3 integration test failed' }
