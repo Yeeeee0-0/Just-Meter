@@ -17,7 +17,7 @@ assert.equal(d.querySelectorAll('.widget').length,4);assert.equal(d.querySelecto
 action('settings');assert(!d.querySelector('.layout-name'));
 change('interfaceLanguage','en');assert.equal(d.querySelector('h1').textContent,'Settings');
 change('theme','dark');assert.equal(d.documentElement.dataset.theme,'dark');
-change('interfaceScale','0.75');assert.equal(d.body.style.zoom,'0.75');
+change('interfaceScale','0.75');assert.equal(Number(d.body.style.zoom),0.75);
 action('about');assert.equal(d.querySelector('[role=dialog] h2').textContent,'Yee Huang');assert.equal(d.querySelector('[role=dialog] a').textContent,'yeehuang2002@163.com');assert(!d.querySelector('[role=dialog]').textContent.includes('Update'));action('close-modal');
 d.querySelector('[data-tab="布局"]').click();assert.equal(d.querySelectorAll('.layout-row').length,1);assert(!d.querySelector('[data-action=layout-options]'));
 action('edit-layout');assert.equal(d.querySelectorAll('.widget').length,4);assert(!d.querySelector('.layout-name'));

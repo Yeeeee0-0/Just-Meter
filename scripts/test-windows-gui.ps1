@@ -18,6 +18,8 @@ $outer = Get-Content $report -Raw | ConvertFrom-Json
 $encoded = $outer.result | ConvertFrom-Json
 $ui = $encoded | ConvertFrom-Json
 if (!$outer.webview -or !$ui.ready -or $ui.widgets -ne 4 -or $ui.errors) { throw "Invalid UI result: $encoded" }
+$value = [double]::Parse($ui.integrated.Replace('−','-'), [Globalization.CultureInfo]::InvariantCulture)
+if ([Math]::Abs($value + 20) -gt 0.15) { throw "Meter display is not driven by decoded audio: $value" }
 $dll = (Get-ChildItem build/windows/VST3/Release -Recurse -File -Filter '*.vst3' | Select-Object -First 1).FullName
 if (!$dll) { throw 'VST3 binary not found' }
 $test = Start-Process build/windows/Release/WindowsPluginHost.exe -ArgumentList "`"$dll`"" -PassThru -NoNewWindow

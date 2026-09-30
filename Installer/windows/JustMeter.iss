@@ -35,6 +35,7 @@ english.Plugin=VST3 plug-in (64-bit)
 english.Desktop=Create a desktop shortcut
 english.Launch=Open Just Meter
 english.Runtime=Microsoft WebView2 Runtime could not be installed. Please retry the installer. Error: 
+english.SelectComponent=Select the standalone app, VST3 plug-in, or both.
 english.InstallingRuntime=Installing the Microsoft WebView2 Runtime…
 chinesesimplified.Full=独立软件和 VST3 插件
 chinesesimplified.Custom=自定义安装
@@ -43,6 +44,7 @@ chinesesimplified.Plugin=VST3 插件（64 位）
 chinesesimplified.Desktop=创建桌面快捷方式
 chinesesimplified.Launch=打开 Just Meter
 chinesesimplified.Runtime=无法安装 Microsoft WebView2 运行时，请重新运行安装程序。错误：
+chinesesimplified.SelectComponent=请选择独立软件、VST3 插件或两者。
 chinesesimplified.InstallingRuntime=正在安装 Microsoft WebView2 运行时…
 
 [Types]
@@ -80,5 +82,14 @@ begin
     WizardForm.StatusLabel.Caption := CustomMessage('InstallingRuntime');
     if not Exec(ExpandConstant('{tmp}\WebView2RuntimeInstallerX64.exe'), '/silent /install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) or not HasRuntime then
       Result := CustomMessage('Runtime') + IntToStr(ResultCode);
+  end;
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if (CurPageID = wpSelectComponents) and (WizardSelectedComponents(False) = '') then begin
+    MsgBox(CustomMessage('SelectComponent'), mbInformation, MB_OK);
+    Result := False;
   end;
 end;
