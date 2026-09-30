@@ -15,6 +15,7 @@ translations = {json.loads(k): json.loads(v) for k, v in pair.findall(source)}
 translations.update({
     '跟随 Windows，或选择固定的浅色与深色外观。': 'Follow Windows or choose a light or dark appearance.',
     '高对比度模式下自动使用实色背景。': 'Use solid backgrounds in high contrast mode.',
+    '最多可保存 64 个自定义布局。': 'You can save up to 64 custom layouts.',
     '跟随 Windows': 'Follows Windows',
     '音频连接失败，请重新选择来源': 'Audio connection failed. Select the source again.',
     '等待宿主音频': 'Waiting for host audio',
